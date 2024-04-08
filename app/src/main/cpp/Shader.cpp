@@ -47,17 +47,20 @@ Shader *Shader::loadShader(
         } else {
             // Get the attribute and uniform locations by name. You may also choose to hardcode
             // indices with layout= in your shader, but it is not done in this sample
-            GLint positionAttribute = glGetAttribLocation(program, positionAttributeName.c_str());
-            GLint uvAttribute = glGetAttribLocation(program, uvAttributeName.c_str());
-            GLint projectionMatrixUniform = glGetUniformLocation(
-                    program,
-                    projectionMatrixUniformName.c_str());
-
+            GLint positionAttribute = -1;
+            GLint uvAttribute = -1;
+            GLint projectionMatrixUniform = -1;
+            if (!positionAttributeName.empty()) {
+                positionAttribute = glGetAttribLocation(program, positionAttributeName.c_str());
+            }
+            if (!uvAttributeName.empty()) {
+                uvAttribute = glGetAttribLocation(program, uvAttributeName.c_str());
+            }
+            if (!projectionMatrixUniformName.empty()) {
+                projectionMatrixUniform = glGetUniformLocation(program, projectionMatrixUniformName.c_str());
+            }
             // Only create a new shader if all the attributes are found.
-            if (positionAttribute != -1
-                && uvAttribute != -1
-                && projectionMatrixUniform != -1) {
-
+            if (positionAttribute != -1) {
                 shader = new Shader(
                         program,
                         positionAttribute,
@@ -127,25 +130,30 @@ void Shader::drawModel(const Model &model) const {
     );
     glEnableVertexAttribArray(position_);
 
-    // The uv attribute is 2 floats
-    glVertexAttribPointer(
-            uv_, // attrib
-            2, // elements
-            GL_FLOAT, // of type float
-            GL_FALSE, // don't normalize
-            sizeof(Vertex), // stride is Vertex bytes
-            ((uint8_t *) model.getVertexData()) + sizeof(Vector3) // offset Vector3 from the start
-    );
-    glEnableVertexAttribArray(uv_);
+    if (uv_ != -1) {
+        // The uv attribute is 2 floats
+        glVertexAttribPointer(
+                uv_, // attrib
+                2, // elements
+                GL_FLOAT, // of type float
+                GL_FALSE, // don't normalize
+                sizeof(Vertex), // stride is Vertex bytes
+                ((uint8_t *) model.getVertexData()) + sizeof(Vector3) // offset Vector3 from the start
+        );
+        glEnableVertexAttribArray(uv_);
 
-    // Setup the texture
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, model.getTexture().getTextureID());
+        // Setup the texture
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, model.getTexture().getTextureID());
+    }
+
 
     // Draw as indexed triangles
     glDrawElements(GL_TRIANGLES, model.getIndexCount(), GL_UNSIGNED_SHORT, model.getIndexData());
 
-    glDisableVertexAttribArray(uv_);
+    if (uv_ != -1) {
+        glDisableVertexAttribArray(uv_);
+    }
     glDisableVertexAttribArray(position_);
 }
 

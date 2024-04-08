@@ -24,6 +24,10 @@
             <meta-data
                 android:name="android.app.lib_name"
                 android:value="androidndktriangle" />
+            <meta-data android:name="android.app.egl_lib_name"
+                android:value="EGL_angle" />
+            <meta-data android:name="android.app.gles_lib_name"
+                android:value="GLESv2_angle" />
         </activity>
     </application>
 

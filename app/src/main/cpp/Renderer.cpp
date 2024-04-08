@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 #include <android/imagedecoder.h>
+#include <android/log.h>
 
 #include "AndroidOut.h"
 #include "Shader.h"
@@ -37,34 +38,53 @@ aout << std::endl;\
 #define CORNFLOWER_BLUE 100 / 255.f, 149 / 255.f, 237 / 255.f, 1
 
 // Vertex shader, you'd typically load this from assets
-static const char *vertex = R"vertex(#version 300 es
-in vec3 inPosition;
-in vec2 inUV;
+//static const char *vertex = R"vertex(#version 300 es
+//in vec3 inPosition;
+//in vec2 inUV;
+//
+//out vec2 fragUV;
+//
+//uniform mat4 uProjection;
+//
+//void main() {
+//    fragUV = inUV;
+//    gl_Position = uProjection * vec4(inPosition, 1.0);
+//}
+//)vertex";
+//
+//// Fragment shader, you'd typically load this from assets
+//static const char *fragment = R"fragment(#version 300 es
+//precision mediump float;
+//
+//in vec2 fragUV;
+//
+//uniform sampler2D uTexture;
+//
+//out vec4 outColor;
+//
+//void main() {
+//    outColor = texture(uTexture, fragUV);
+//}
+//)fragment";
 
-out vec2 fragUV;
+// Simple vertex shader
+const char* simpleVertexShaderSrc = R"glsl(#version 300 es
+    layout(location = 0) in vec4 vertexPosition;
 
-uniform mat4 uProjection;
+    void main() {
+        gl_Position = vertexPosition;
+    }
+)glsl";
 
-void main() {
-    fragUV = inUV;
-    gl_Position = uProjection * vec4(inPosition, 1.0);
-}
-)vertex";
+// Simple fragment shader
+const char* simpleFragmentShaderSrc = R"glsl(#version 300 es
+    precision mediump float;
+    out vec4 fragColor;
 
-// Fragment shader, you'd typically load this from assets
-static const char *fragment = R"fragment(#version 300 es
-precision mediump float;
-
-in vec2 fragUV;
-
-uniform sampler2D uTexture;
-
-out vec4 outColor;
-
-void main() {
-    outColor = texture(uTexture, fragUV);
-}
-)fragment";
+    void main() {
+        fragColor = vec4(1.0, 0.0, 0.0, 1.0); // Red color
+    }
+)glsl";
 
 /*!
  * Half the height of the projection matrix. This gives you a renderable area of height 4 ranging
@@ -99,8 +119,67 @@ Renderer::~Renderer() {
         display_ = EGL_NO_DISPLAY;
     }
 }
+#include "MyShader.h"
+#define LOG_TAG "RENDERER"
+#define ALOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__);
+#define ALOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__);
+#define ALOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__);
+bool firstRun = true;
 
 void Renderer::render() {
+
+    if (firstRun)
+    {
+        unsigned int vertexShader0 = glCreateShader(GL_VERTEX_SHADER);
+        glShaderSource(vertexShader0, 1, &vertexShaderSource0, NULL);
+        glCompileShader(vertexShader0);
+        // check for shader compile errors
+        int success0;
+        char infoLog0[512];
+        glGetShaderiv(vertexShader0, GL_COMPILE_STATUS, &success0);
+        if (!success0)
+        {
+            glGetShaderInfoLog(vertexShader0, 512, NULL, infoLog0);
+            ALOGD("ERROR::SHADER::VERTEX::COMPILATION_FAILED\n%s\n", infoLog0);
+        }
+        // fragment shader
+        unsigned int fragmentShader0 = glCreateShader(GL_FRAGMENT_SHADER);
+        glShaderSource(fragmentShader0, 1, &fragmentShaderSource0, NULL);
+        glCompileShader(fragmentShader0);
+        // check for shader compile errors
+        glGetShaderiv(fragmentShader0, GL_COMPILE_STATUS, &success0);
+        if (!success0)
+        {
+            glGetShaderInfoLog(fragmentShader0, 512, NULL, infoLog0);
+            ALOGD("ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n%s\n", infoLog0);
+        }
+        // link shaders
+        unsigned int shaderProgram0 = glCreateProgram();
+        glAttachShader(shaderProgram0, vertexShader0);
+        glAttachShader(shaderProgram0, fragmentShader0);
+        glLinkProgram(shaderProgram0);
+        // check for linking errors
+        glGetProgramiv(shaderProgram0, GL_LINK_STATUS, &success0);
+        if (!success0) {
+            glGetProgramInfoLog(shaderProgram0, 512, NULL, infoLog0);
+            ALOGD("ERROR::SHADER::PROGRAM::LINKING_FAILED\n%s\n", infoLog0);
+        }
+        glDetachShader(shaderProgram0, vertexShader0);
+        glDetachShader(shaderProgram0, fragmentShader0);
+        glDeleteShader(vertexShader0);
+        glDeleteShader(fragmentShader0);
+
+        const GLubyte* slVersion0 = glGetString(GL_SHADING_LANGUAGE_VERSION);
+        ALOGE("GLSL Version: %s\n", slVersion0);
+
+        GLint attributeCount0 = 0;
+        glGetProgramiv(shaderProgram0, GL_ACTIVE_ATTRIBUTES, &attributeCount0);
+        ALOGE("GL_ACTIVE_ATTRIBUTES = %d\n", attributeCount0);
+
+        firstRun = false;
+    }
+
+
     // Check to see if the surface has changed size. This is _necessary_ to do every frame when
     // using immersive mode as you'll get no other notification that your renderable area has
     // changed.
@@ -221,8 +300,11 @@ void Renderer::initRenderer() {
     PRINT_GL_STRING(GL_VERSION);
     PRINT_GL_STRING_AS_LIST(GL_EXTENSIONS);
 
+//    shader_ = std::unique_ptr<Shader>(
+//            Shader::loadShader(vertex, fragment, "inPosition", "inUV", "uProjection"));
     shader_ = std::unique_ptr<Shader>(
-            Shader::loadShader(vertex, fragment, "inPosition", "inUV", "uProjection"));
+            Shader::loadShader(simpleVertexShaderSrc, simpleFragmentShaderSrc,
+                               "vertexPosition", "", ""));
     assert(shader_);
 
     // Note: there's only one shader in this demo, so I'll activate it here. For a more complex game
@@ -261,33 +343,45 @@ void Renderer::updateRenderArea() {
  * @brief Create any demo models we want for this demo.
  */
 void Renderer::createModels() {
-    /*
-     * This is a square:
-     * 0 --- 1
-     * | \   |
-     * |  \  |
-     * |   \ |
-     * 3 --- 2
-     */
-    std::vector <Vertex> vertices = {
-            Vertex(Vector3{1, 1, 0}, Vector2{0, 0}), // 0
-            Vertex(Vector3{-1, 1, 0}, Vector2{1, 0}), // 1
-            Vertex(Vector3{-1, -1, 0}, Vector2{1, 1}), // 2
-            Vertex(Vector3{1, -1, 0}, Vector2{0, 1}) // 3
-    };
-    std::vector <Index> indices = {
-            0, 1, 2, 0, 2, 3
+    // Define vertices for the triangle
+    std::vector<Vertex> vertices = {
+            Vertex(Vector3{0.0f,  0.5f, 0.0f}, Vector2{0.0f, 0.0f}), // Top
+            Vertex(Vector3{-0.5f, -0.5f, 0.0f}, Vector2{0.0f, 0.0f}), // Bottom left
+            Vertex(Vector3{0.5f, -0.5f, 0.0f}, Vector2{0.0f, 0.0f})   // Bottom right
     };
 
-    // loads an image and assigns it to the square.
-    //
-    // Note: there is no texture management in this sample, so if you reuse an image be careful not
-    // to load it repeatedly. Since you get a shared_ptr you can safely reuse it in many models.
-    auto assetManager = app_->activity->assetManager;
-    auto spAndroidRobotTexture = TextureAsset::loadAsset(assetManager, "android_robot.png");
+    // Triangle indices
+    std::vector<Index> indices = {0, 1, 2};
 
-    // Create a model and put it in the back of the render list.
-    models_.emplace_back(vertices, indices, spAndroidRobotTexture);
+    // Create a model for the triangle and add it to the models list
+    models_.emplace_back(vertices, indices, nullptr); // No texture for the simple triangle
+//    /*
+//     * This is a square:
+//     * 0 --- 1
+//     * | \   |
+//     * |  \  |
+//     * |   \ |
+//     * 3 --- 2
+//     */
+//    std::vector <Vertex> vertices = {
+//            Vertex(Vector3{1, 1, 0}, Vector2{0, 0}), // 0
+//            Vertex(Vector3{-1, 1, 0}, Vector2{1, 0}), // 1
+//            Vertex(Vector3{-1, -1, 0}, Vector2{1, 1}), // 2
+//            Vertex(Vector3{1, -1, 0}, Vector2{0, 1}) // 3
+//    };
+//    std::vector <Index> indices = {
+//            0, 1, 2, 0, 2, 3
+//    };
+//
+//    // loads an image and assigns it to the square.
+//    //
+//    // Note: there is no texture management in this sample, so if you reuse an image be careful not
+//    // to load it repeatedly. Since you get a shared_ptr you can safely reuse it in many models.
+//    auto assetManager = app_->activity->assetManager;
+//    auto spAndroidRobotTexture = TextureAsset::loadAsset(assetManager, "android_robot.png");
+//
+//    // Create a model and put it in the back of the render list.
+//    models_.emplace_back(vertices, indices, spAndroidRobotTexture);
 }
 
 void Renderer::handleInput() {

@@ -1,4 +1,5 @@
 #include <jni.h>
+#include <dlfcn.h>
 
 #include "AndroidOut.h"
 #include "Renderer.h"
@@ -62,6 +63,16 @@ bool motion_event_filter_func(const GameActivityMotionEvent *motionEvent) {
 void android_main(struct android_app *pApp) {
     // Can be removed, useful to ensure your code is running
     aout << "Welcome to android_main" << std::endl;
+
+    void* libEGL = dlopen("libEGL_angle.so", RTLD_LAZY | RTLD_GLOBAL);
+    if (!libEGL) {
+        // Handle error
+    }
+
+    void* libGLESv2 = dlopen("libGLESv2_angle.so", RTLD_LAZY | RTLD_GLOBAL);
+    if (!libGLESv2) {
+        // Handle error
+    }
 
     // Register an event handler for Android events
     pApp->onAppCmd = handle_cmd;

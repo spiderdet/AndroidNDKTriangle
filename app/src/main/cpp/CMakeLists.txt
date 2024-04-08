@@ -5,6 +5,8 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project("androidndktriangle")
 
+set(ANGLE_LIB_DIR ${CMAKE_SOURCE_DIR}/../jniLibs/${ANDROID_ABI})
+
 # Creates your game shared library. The name must be the same as the
 # one used for loading in your Kotlin/Java or AndroidManifest.txt files.
 add_library(androidndktriangle SHARED
@@ -27,6 +29,9 @@ target_link_libraries(androidndktriangle
         # and interacting with Android system
         EGL
         GLESv3
+#        ${ANGLE_LIB_DIR}/libEGL_angle.so
+#        ${ANGLE_LIB_DIR}/libGLESv1_CM_angle.so
+#        ${ANGLE_LIB_DIR}/libGLESv2_angle.so
         jnigraphics
         android
         log)
